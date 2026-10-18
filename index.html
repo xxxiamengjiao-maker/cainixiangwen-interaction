@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>企微动态交互流程-内容全量</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: -apple-system, "PingFang SC", "Helvetica Neue", sans-serif; background: #F5F6F8; color: #111; }
+  .page { max-width: 420px; margin: 0 auto; min-height: 100vh; display: flex; flex-direction: column; }
+  .chat { flex: 1; padding: 16px; overflow-y: auto; }
+  .card { background: #fff; border-radius: 12px; padding: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.04); margin-bottom: 16px; }
+  .card h3 { margin: 0 0 16px; font-size: 17px; }
+  .card h4 { margin: 0 0 10px; font-size: 15px; }
+  .tip-box { background: #F7F8FA; border-radius: 8px; padding: 14px 16px; color: #666; font-size: 14px; margin-bottom: 20px; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .btn { background: #F2F2F2; color: #007AFF; border: none; border-radius: 8px; padding: 18px 0; font-size: 15px; cursor: pointer; }
+  .btn:active { background: #E6E6E6; }
+
+  /* 原地替换后的子菜单卡片 */
+  .domain-card { padding: 0; overflow: hidden; display: flex; flex-direction: column; max-height: 78vh; }
+  .domain-head { padding: 14px 20px 10px; border-bottom: 1px solid #EEE; font-size: 13.5px; color: #888; display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+  .domain-head i { display: inline-block; width: 20px; height: 20px; background: #1677FF; color: #fff; border-radius: 4px; font-style: normal; font-size: 12px; text-align: center; line-height: 20px; font-weight: bold; }
+  .domain-body { padding: 16px 20px 10px; overflow-y: auto; flex: 1; min-height: 0; }
+  .domain-body::-webkit-scrollbar { width: 3px; }
+  .domain-body::-webkit-scrollbar-thumb { background: #DDD; border-radius: 3px; }
+  .domain-body h3 { margin: 0 0 8px; font-size: 18px; font-weight: 700; }
+  .item { padding: 13px 0; border-top: 1px solid #EEE; font-size: 15px; line-height: 1.7; color: #111; }
+  .item:first-of-type { border-top: none; }
+  .item .t { font-weight: 700; font-size: 15px; }
+  .item .d { color: #888; font-size: 14px; margin-top: 2px; }
+  .item .note { color: #888; font-size: 13.5px; line-height: 1.6; margin-top: 6px; }
+  .divider { display: flex; align-items: center; gap: 10px; color: #BBB; font-size: 12px; padding: 10px 0 2px; }
+  .divider::before, .divider::after { content: ""; flex: 1; height: 1px; background: #E8E8E8; }
+  .divider + .item { border-top: none; }
+  .domain-foot { display: flex; border-top: 1px solid #EEE; flex-shrink: 0; }
+  .domain-foot button { flex: 1; padding: 16px; border: none; background: #fff; font-size: 15px; cursor: pointer; color: #333; }
+  .domain-foot button + button { border-left: 1px solid #EEE; color: #1677FF; font-weight: 600; }
+  .domain-foot button:active { background: #F5F5F5; }
+
+  /* 用户消息气泡（企微真实样式：浅蓝气泡 + 右侧头像） */
+  .user-msg { display: flex; justify-content: flex-end; align-items: flex-start; gap: 10px; margin-bottom: 16px; }
+  .user-msg .bubble { position: relative; background: #CCE4FF; color: #000; padding: 10px 14px; border-radius: 8px; font-size: 15px; max-width: 70%; line-height: 1.5; }
+  .user-msg .bubble::after { content: ""; position: absolute; right: -6px; top: 14px; border: 6px solid transparent; border-left-color: #CCE4FF; border-right: 0; }
+  .user-msg .avatar { width: 40px; height: 40px; border-radius: 6px; flex-shrink: 0; background: linear-gradient(135deg, #5B6B7C, #2E3A48); display: flex; align-items: center; justify-content: center; color: #fff; font-size: 14px; font-weight: 600; }
+
+  /* 全量功能卡片（输入框发送后） */
+  .section { padding: 14px 0; border-bottom: 1px dashed #E0E0E0; }
+  .section:last-of-type { border-bottom: none; padding-bottom: 0; }
+  .section h4 { margin: 0 0 8px; font-size: 15px; }
+  .section p { margin: 6px 0; font-size: 14px; line-height: 1.6; color: #333; }
+  .section p::before { content: "· "; }
+  .cmd { color: #007AFF; font-weight: bold; }
+  .snote { color: #999; font-size: 13px; margin: 4px 0 0 12px; }
+
+  /* 底部输入框 */
+  .input-bar { display: flex; gap: 10px; padding: 12px 16px 24px; background: #F5F6F8; position: sticky; bottom: 0; }
+  .input-bar input { flex: 1; height: 48px; border: 1px solid #DDD; border-radius: 8px; padding: 0 14px; font-size: 15px; background: #fff; }
+  .input-bar input:focus { outline: none; border-color: #007AFF; }
+  .input-bar button { width: 84px; height: 48px; background: #007AFF; color: #fff; border: none; border-radius: 8px; font-size: 16px; cursor: pointer; }
+  .hidden { display: none; }
+  @keyframes fadeUp { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+  .fade { animation: fadeUp .2s ease; }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="chat" id="chat">
+
+    <!-- 这张卡会被"原地替换"：首页 ⇄ 子菜单 -->
+    <div id="mainCard">
+      <div class="card" id="home">
+        <h3>想知道我能为你做什么？你可以这样了解我</h3>
+        <h4>1. 指令引导</h4>
+        <div class="tip-box">试试对我说：你能帮我做什么？</div>
+        <h4>2. 功能快捷选择如下</h4>
+        <div class="grid">
+          <button class="btn" onclick="clickBtn('customer')">找客户</button>
+          <button class="btn" onclick="clickBtn('product')">查商品</button>
+          <button class="btn" onclick="clickBtn('order')">查订单</button>
+          <button class="btn" onclick="clickBtn('purchase')">采购查询</button>
+          <button class="btn" onclick="clickBtn('finance')">对账开票</button>
+          <button class="btn" onclick="clickBtn('other')">其他</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 输入框发送后：用户气泡 + 全量功能卡片 -->
+    <div class="user-msg hidden" id="userMsg">
+      <div class="bubble" id="userText"></div>
+      <div class="avatar">我</div>
+    </div>
+    <div class="card hidden" id="detail">
+      <h3>你好！我能帮你处理这些事 👋</h3>
+      <div class="section"><h4>🔍 找客户</h4>
+        <p>查客户信息：<span class="cmd">查客户 XX公司</span></p>
+        <p>查商品池 / 下架 SKU：<span class="cmd">查商品池 C001</span></p></div>
+      <div class="section"><h4>📦 查商品</h4>
+        <p>找货：发关键词、SKU 或商品图片，AI 自动找货</p>
+        <p>查库存交期：<span class="cmd">查商品 SKUXX 上海</span></p>
+        <p>查商品资料文件：<span class="cmd">查文件 SKUXX</span></p>
+        <p>查品牌授权文件：<span class="cmd">查授权 XX品牌</span></p></div>
+      <div class="section"><h4>📄 查订单</h4>
+        <p>查物流进度：<span class="cmd">查物流 SOXXXX</span></p>
+        <p>查客户名下订单：<span class="cmd">查订单号 C001</span></p>
+        <p>单号互查：<span class="cmd">关联单号 XXXX</span>（采购单 / VC 送货单 / SAP 销售订单）</p>
+        <p>查送货单详情：<span class="cmd">查送货单 XXXX</span></p>
+        <p>创建 / 取消交货单：<span class="cmd">创建交货单 SOXXXX</span> · <span class="cmd">取消交货单 XXXX</span></p></div>
+      <div class="section"><h4>🛒 采购查询</h4>
+        <p>查采购单详情 / 到货时间 / 随货资料</p></div>
+      <div class="section"><h4>🧾 对账开票</h4>
+        <p>查信用额度 / 逾期：<span class="cmd">查信用 C001</span></p>
+        <p>查发票状态 / 进度：<span class="cmd">查发票 SOXXXX</span></p>
+        <p>申请开票（支持单独 / 合并）：<span class="cmd">申请开票 XXXX</span></p>
+        <div class="snote">支持单据：SAP销售单、OMS销售单、SAP交货单、OMS交货单、OMS外围单</div></div>
+      <div class="section"><h4>➕ 其他办公</h4>
+        <p>找人：产线 / 销售客服 / 仓库对接人 / 值班人员</p>
+        <p>找知识：公司制度 · 人事行政政策 · 工业品产品知识 · IT</p>
+        <p>查个人信息：考勤 / 假期 / 报销 / 津贴</p>
+        <p>OA 申请：请假 · 补卡 · 会议 · 用印 · 合同签署</p>
+        <p>工单：工单查询 / 一句话发工单</p>
+        <p>协同：协同查询 / 创建合同盖章申请</p>
+        <p>资料：资料查询 / 获取模板中心文件</p>
+        <p>数智化入口：PRA / AI 开发者平台地址查询</p></div>
+    </div>
+  </div>
+
+  <div class="input-bar">
+    <input type="text" id="input" placeholder="你能帮我做什么？" onkeydown="if(event.key==='Enter')send()">
+    <button onclick="send()">发送</button>
+  </div>
+</div>
+
+<script>
+  var DOMAINS = {
+    customer: { title: '找客户', items: [
+      { text: '输入客户名称，发送 查客户 XX公司' },
+      { text: '输入客户编码，发送 查商品池 C001，查询 / 下架该客户商品池 SKU' }
+    ]},
+    product: { title: '查商品', items: [
+      { text: '发送关键词、SKU 或商品图片，AI 自动找货' },
+      { text: '输入 SKU + 城市，发送 查商品 SKUXX 上海，查交期及库存' },
+      { text: '输入 SKU，发送 查文件 SKUXX，获取商品资料文件' },
+      { text: '输入品牌名称，发送 查授权 XX品牌，获取品牌授权文件' }
+    ]},
+    order: { title: '查订单', items: [
+      { text: '输入订单号，发送 查物流 SOXXXX，查履约 / 物流进度' },
+      { text: '输入客户编码，发送 查订单号 C001，查该客户名下的销售订单号' },
+      { text: '输入采购单号 / VC 送货单号，发送 关联单号 XXXX，互查采购单号 / VC 送货单号 / SAP 销售订单号' },
+      { text: '输入送货单号，发送 查送货单 XXXX，查送货单详情' },
+      { divider: '其他操作' },
+      { text: '输入销售单号，发送 创建交货单 SOXXXX' },
+      { text: '输入销售单号 / DN 单号，发送 取消交货单 XXXX' }
+    ]},
+    purchase: { title: '采购查询', items: [
+      { text: '输入采购单号，发送 查采购单 XXXX，查采购单详情及状态' },
+      { text: '输入采购单号，发送 查到货时间 XXXX，查预计到货时间' },
+      { text: '输入采购单号，发送 查随货资料 XXXX，获取随货文件' }
+    ]},
+    finance: { title: '对账开票', items: [
+      { text: '输入客户编码，发送 查信用 C001，查信用额度 / 逾期情况' },
+      { text: '输入订单号，发送 查发票 SOXXXX，查发票状态 / 进度' },
+      { divider: '开票操作' },
+      { text: '输入订单号，发送 申请开票 XXXX，支持单独 / 合并开票', notes: [
+        '支持单据类型：SAP销售单、OMS销售单、SAP交货单、OMS交货单、OMS外围单、其他格式',
+        '例：申请开票 1500021012 1010096815 合并' ] }
+    ]},
+    other: { title: '其他', items: [
+      { title: '找人', desc: '找产线 / 销售客服 / 仓库对接人 / 值班人员' },
+      { title: '找知识', desc: '公司制度 · 人事行政政策 · 工业品产品知识 · IT' },
+      { title: '查个人信息', desc: '考勤 / 假期 / 报销 / 津贴' },
+      { title: 'OA 申请', desc: '请假 · 补卡 · 会议 · 用印 · 合同签署' },
+      { divider: '其他功能' },
+      { title: '工单', desc: '工单查询 / 一句话发工单' },
+      { title: '协同', desc: '协同查询 / 创建合同盖章申请' },
+      { title: '资料', desc: '资料查询 / 获取模板中心文件' },
+      { title: '数智化入口', desc: 'PRA / AI 开发者平台地址查询' }
+    ]}
+  };
+
+  var homeHTML = document.getElementById('mainCard').innerHTML;
+
+  // 点按钮 → 模拟服务端回调后原地替换卡片
+  function clickBtn(id) {
+    setTimeout(function(){ replaceCard(id); }, 300);
+  }
+
+  function replaceCard(id) {
+    var d = DOMAINS[id];
+    var html = '<div class="card domain-card fade">'
+      + '<div class="domain-head"><i>A</i>AI行家助手</div>'
+      + '<div class="domain-body"><h3>' + d.title + '</h3>';
+    d.items.forEach(function(it){
+      if (it.divider) { html += '<div class="divider">' + it.divider + '</div>'; return; }
+      html += '<div class="item">';
+      if (it.title) html += '<div class="t">' + it.title + '</div><div class="d">' + it.desc + '</div>';
+      else html += it.text;
+      if (it.notes) it.notes.forEach(function(n){ html += '<div class="note">' + n + '</div>'; });
+      html += '</div>';
+    });
+    html += '</div><div class="domain-foot">'
+      + '<button onclick="backHome()">返回上级</button>'
+      + '<button onclick="backHome()">返回菜单</button>'
+      + '</div></div>';
+    document.getElementById('mainCard').innerHTML = html;
+  }
+
+  function backHome() {
+    document.getElementById('mainCard').innerHTML = homeHTML;
+  }
+
+  function send(text) {
+    var input = document.getElementById('input');
+    var msg = text || input.value.trim() || input.placeholder;
+    document.getElementById('userText').textContent = msg;
+    document.getElementById('userMsg').classList.remove('hidden');
+    document.getElementById('detail').classList.remove('hidden');
+    input.value = '';
+    document.getElementById('detail').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+</script>
+</body>
+</html>
